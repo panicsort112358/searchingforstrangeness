@@ -141,7 +141,7 @@ These are the source definitions currently encoded in the staged campaign XMLs.
 
 The repo no longer keeps helper scripts for good-runs SAM-definition creation.
 The explicit `samweb create-definition ...` commands now live at the bottom of
-`SAMPLES`, alongside the `original reco2`, `goodruns list`, and `updated
+`SAMPLES.md`, alongside the `original reco2`, `goodruns list`, and `updated
 reco2` mapping for each sample.
 
 

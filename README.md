@@ -1,0 +1,139 @@
+# searchingforstrangeness
+
+This repository contains the MicroBooNE strangeness-analysis code used inside a
+`ubana` development area. It provides event-selection modules, analysis tools,
+imaging and inference producers, FHiCL job configuration, and helper scripts
+for local and grid processing.
+
+## Documentation map
+
+The top-level documents are intentionally split by purpose:
+
+- `README.md`: This file. It is a short overview of the repository, where the
+  main entry points live, and which document to read next.
+- `INSTALL.md`: Setup and build instructions for a `ubana`/MRB development area.
+- `USAGE.md`: How to run the checked-in jobs, use the helper scripts, and submit
+  the shipped grid workflow.
+- `SAMPLES.md`: Good-runs SAM definition mappings and creation commands across
+  runs.
+- `LICENSE`: MIT licensing terms for the repository.
+- `scripts/README.md`: Dataset naming, SAM-definition helpers, and
+  sample-management notes.
+- `reference/`: Extensionless reference copies of external batch-tool scripts
+  kept in a format that is easy for LLM and text-ingestion tooling to read.
+
+Project-authored documentation, diagnostics, comments, and identifiers use
+British English. Names owned by external APIs, data formats, legal titles,
+and verbatim files under `reference/` retain their upstream spellings.
+
+## Requirements
+
+The package assumes a working MicroBooNE/LArSoft environment with:
+
+- access to the MicroBooNE container and CVMFS products;
+- an MRB development area;
+- a checkout of `ubana`;
+- standard tools such as `mrb`, `lar`, `samweb`, `hadd`, and `project.py`.
+
+This is not a standalone generic package with a portable configure-and-install
+workflow. It is meant to be built and used from the expected `ubana` context.
+
+## Repository layout
+
+- `AnalysisTools/`: analysis tool implementations
+- `SelectionTools/`: event-selection tool implementations
+- `Helpers/`: shared utilities and helper classes
+- `ImagePipeline/`: image-production and inference support
+- `Products/`: `art` product definitions
+- `job/`: standard production FHiCL files
+- `job/dev/`: development and debugging FHiCL files
+- `scripts/`: helper scripts and operational notes
+- `xml/`: grid job XML configurations
+- `runtime/`: model checkpoints, detector data, and inference helpers
+- `reference/`: LLM-friendly plain-text reference copies of batch tools
+
+## Checked-in entry points
+
+The main top-level job configurations are:
+
+- `run_redk2nu_fhc.fcl` (from the sibling `ubana` `redk2nu` package)
+- `run_redk2nu_rhc.fcl` (from the sibling `ubana` `redk2nu` package)
+- `job/run_nuselection.fcl`
+- `job/run_nuselection_data.fcl`
+- `job/run_nuselection_slim.fcl`
+- `job/run_nuselection_data_slim.fcl`
+- `job/run_nuselection_slim_oldflux_rw.fcl`
+- `job/run_imageprod.fcl`
+- `job/run_inferenceprod.fcl`
+- `job/run_fullchain.fcl`
+- `job/run_fullchain_data.fcl`
+- `job/run_fullchain_oldflux_rw.fcl`
+- `job/run_fullchain_slim.fcl`
+- `job/run_fullchain_slim_oldflux_rw.fcl`
+
+The main development configurations are:
+
+- `job/dev/flux/run_imageprod_dev.fcl`
+- `job/dev/flux/run_imageprod_oldflux_rw_dev.fcl`
+- `job/dev/run_imageprod_data_dev.fcl`
+- `job/dev/run_stage_sel_dev.fcl`
+- `job/dev/run_stage_fullchain_dev.fcl`
+- `job/dev/flux/run_local_ntuple_dev.fcl`
+- `job/dev/flux/run_local_ntuple_oldflux_dev.fcl`
+- `job/dev/numi_fhc_run1_dev.xml`
+
+Standalone `redk2nu` and `EventWeight` debugging now uses the upstream FHiCL
+entry points directly through `.local.sh`, for example `run_redk2nu_fhc.fcl`
+and `run_eventweight_microboone_sept24_numi_fhc.fcl`.
+
+The main grid-submission XML configurations are:
+
+- `xml/numi_run1_fhc_campaign.xml`
+- `xml/numi_run2a_fhc_campaign.xml`
+- `xml/numi_run2b_rhc_campaign.xml`
+- `xml/numi_run3b_rhc_campaign.xml`
+- `xml/numi_run4a_rhc_campaign.xml`
+- `xml/numi_run4b_rhc_campaign.xml`
+- `xml/numi_run4c_fhc_campaign.xml`
+- `xml/numi_run4d_fhc_campaign.xml`
+- `xml/numi_run5_fhc_campaign.xml`
+
+Older XMLs were archived under `reference/legacy_xml/` so `xml/` only contains
+the current staged campaign entry points.
+
+For Run 1, `xml/numi_run1_fhc_campaign.xml` is the active test campaign and
+only carries the overlay beam MC, dirt MC, dedicated strangeness MC, and the
+checked-in Run 1 EXT surface. The current EXT surface is still being treated
+as a Run 1 FHC-era sample by temporary convention until a stricter FHC-period
+filter definition is introduced. That test campaign also skips inference and
+stops at `imageprod -> nuselection_*_slim`.
+
+The repository root also contains helper scripts commonly used during local
+work:
+
+- `.container.sh`
+- `.setup.sh`
+- `.build.sh`
+- `.tar.sh`
+
+Several checked-in FHiCL files use relative paths under `runtime/`. In normal
+use, run jobs from the repository top directory so those paths resolve
+correctly.
+
+## Suggested reading order
+
+1. Read `INSTALL.md` to set up the development area and build the package.
+2. Read `USAGE.md` to run local jobs or grid workflows.
+3. Read `scripts/README.md` and `SAMPLES.md` when working with sample
+   definitions or dataset bookkeeping.
+4. Read `LICENSE` for the repository terms.
+
+## Licence
+
+This repository is distributed under the MIT License. See `LICENSE`.
+
+## End
+
+The repository is documented as a working analysis package rather than as a
+generic software distribution. The operational details live in `INSTALL.md` and
+`USAGE.md`; this file is only the front page.
