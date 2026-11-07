@@ -1,0 +1,171 @@
+#include "particleinventoryservice.fcl"
+#include "producers.fcl"
+
+microboone_calo_mcc9_data: {
+    CalAreaConstants: [ 4.31e-3, 4.02e-3, 4.10e-3 ]
+    CalAmpConstants:  [ 9.2e-4, 1.062e-3, 1.08e-3 ]
+    CaloDoLifeTimeCorrection: false
+    CaloLifeTimeForm: 0
+    CaloUseModBox: true
+}
+
+default_analysis: {
+    tool_type: "DefaultAnalysis"
+    PFPproducer: @local::standard_producers.PFPproducer
+    CLSproducer: @local::standard_producers.CLSproducer
+    MCTproducer: @local::standard_producers.MCTproducer
+    MCFproducer: @local::standard_producers.MCFproducer
+    HITproducer: @local::standard_producers.HITproducer
+    SLCproducer: @local::standard_producers.SLCproducer
+    SPproducer: @local::standard_producers.SPproducer
+    MCPproducer: @local::standard_producers.MCPproducer
+
+    makeNuMINtuple: true
+
+    NuMISWTriggerProcName: "DataOverlayOptical"
+}
+
+signal_analysis: {
+    tool_type: "SignalAnalysis"
+    MCTproducer: @local::standard_producers.MCTproducer
+    MCPproducer: @local::standard_producers.MCPproducer
+    CLSproducer: @local::standard_producers.CLSproducer
+    HITproducer: @local::standard_producers.HITproducer
+    BKTproducer: @local::standard_producers.BKTproducer
+
+}
+
+
+event_weight_analysis: {
+    tool_type: "EventWeightAnalysis"
+    createDedicatedTree: false
+    createMapBranch: false
+    createFluxBranch: false
+    createGenieBranch: true
+    createReintBranch: true
+    createReintComponentBranches: true
+    createSplineBranch: true
+    createTuneBranch: true
+    createSplineTimesTuneBranch: true
+    createPPFXBranch: true
+    makeNuMINtuple: true
+    genieAllUniverses: 100
+    ppfxAllUniverses: 100
+
+    useReweightedFlux: false
+    eventWeightProcessName00: "EventWeightSep24"
+    eventWeightProcessName01: "EventWeightSep24ExtraGENIE1"
+    eventWeightProcessName02: "EventWeightSep24ExtraGENIE2"
+    eventWeightProcessName03: "EventWeightSep24ExtraGENIE3"
+    eventWeightProcessName04: "EventWeightSep24ExtraGENIE4"
+    eventWeightProcessName05: "EventWeightSep24ExtraGENIE5"
+    reintProcessName: ""
+    reintModuleLabel: "eventweightreint"
+}
+
+event_weight_analysis_oldflux_rw: @local::event_weight_analysis
+event_weight_analysis_oldflux_rw.useReweightedFlux: true
+event_weight_analysis_oldflux_rw.eventWeightProcessName00: "EventWeightSep24OldRW"
+event_weight_analysis_oldflux_rw.eventWeightProcessName01: "EventWeightSep24OldRWExtraGENIE1"
+event_weight_analysis_oldflux_rw.eventWeightProcessName02: "EventWeightSep24OldRWExtraGENIE2"
+event_weight_analysis_oldflux_rw.eventWeightProcessName03: "EventWeightSep24OldRWExtraGENIE3"
+event_weight_analysis_oldflux_rw.eventWeightProcessName04: "EventWeightSep24OldRWExtraGENIE4"
+event_weight_analysis_oldflux_rw.eventWeightProcessName05: "EventWeightSep24OldRWExtraGENIE5"
+event_weight_analysis_oldflux_rw.reintProcessName: "EventWeight"
+
+image_analysis: {
+    tool_type: "ImageAnalysis"
+    PFPproducer: @local::standard_producers.PFPproducer
+    CLSproducer: @local::standard_producers.CLSproducer
+    HITproducer: @local::standard_producers.HITproducer
+    WIREproducer: @local::standard_producers.WIREproducer
+    MCPproducer: @local::standard_producers.MCPproducer
+    SLCproducer: @local::standard_producers.SLCproducer
+    ImagesCroppedTag: "imageprod:CroppedWindow"
+    ImagesFullTag: "imageprod:FullWindow"
+    InferencePredTag: "inferenceprod"
+    InferencePerfTag: "inferenceprod"
+}
+
+image_analysis_slim: @local::image_analysis
+image_analysis_slim.InferencePredTag: ""
+image_analysis_slim.InferencePerfTag: ""
+
+event_weight_analysis_slim: @local::event_weight_analysis
+event_weight_analysis_slim.createFluxBranch: false
+event_weight_analysis_slim.createGenieBranch: false
+event_weight_analysis_slim.createReintBranch: false
+event_weight_analysis_slim.createSplineBranch: true
+event_weight_analysis_slim.createTuneBranch: true
+event_weight_analysis_slim.createSplineTimesTuneBranch: true
+event_weight_analysis_slim.createPPFXBranch: false
+event_weight_analysis_slim.createGenieUpDnVecs: false
+event_weight_analysis_slim.genieAllUniverses: 0
+event_weight_analysis_slim.ppfxAllUniverses: 0
+event_weight_analysis_slim.makeNuMINtuple: false
+event_weight_analysis_slim.eventWeightProcessName00: "FullChainNuSelectionSlim"
+
+event_weight_analysis_slim_oldflux_rw: @local::event_weight_analysis_slim
+event_weight_analysis_slim_oldflux_rw.useReweightedFlux: true
+event_weight_analysis_slim_oldflux_rw.eventWeightProcessName00: "FullChainNuSelectionSlimOldFluxRW"
+event_weight_analysis_slim_oldflux_rw.reintProcessName: ""
+
+truth_analysis: {
+    tool_type: "TruthAnalysis"
+    MCTproducer: @local::standard_producers.MCTproducer
+    MCFproducer: @local::standard_producers.MCFproducer
+    MCPproducer: @local::standard_producers.MCPproducer
+    HITproducer: @local::standard_producers.HITproducer
+    BKTproducer: @local::standard_producers.BKTproducer
+    MCRproducer: @local::standard_producers.MCRproducer
+    CLSproducer: @local::standard_producers.CLSproducer
+}
+
+event_selection_filter: {
+    module_type: "EventSelectionFilter"
+    PFPproducer: @local::standard_producers.PFPproducer
+    CLSproducer: @local::standard_producers.CLSproducer
+    SLCproducer: @local::standard_producers.SLCproducer
+    HITproducer: @local::standard_producers.HITproducer
+    SHRproducer: @local::standard_producers.SHRproducer
+    VTXproducer: @local::standard_producers.VTXproducer
+    TRKproducer: @local::standard_producers.TRKproducer
+    PCAproducer: @local::standard_producers.PCAproducer
+    MCPproducer: @local::standard_producers.MCPproducer
+    WIREproducer: @local::standard_producers.WIREproducer
+    MCTproducer: @local::standard_producers.MCTproducer
+    BKTproducer: @local::standard_producers.BKTproducer
+    verbose: false
+    filter: true
+    IsData: false
+    IsFakeData: false
+    CountWithOpFilter:  true
+    OpFilterProcName:   "DataStage1Optical"
+    OpFilterPEBeamMin:  0.0
+    OpFilterPEVetoMax:  1.0e9
+    POTProducerData:    "beamdata"
+    POTProducerMC:      "generator"
+}
+
+neutrino_selection: {
+    tool_type: "NeutrinoSelection"
+}
+
+neutrino_selection_filter: {
+    @table::event_selection_filter
+    SelectionTool: @local::neutrino_selection
+    AnalysisTools: {
+        default: @local::default_analysis
+        weight: @local::event_weight_analysis
+        image: @local::image_analysis
+        signal: @local::signal_analysis
+        truth: @local::truth_analysis
+    }
+}
+
+neutrino_selection_filter_slim: @local::neutrino_selection_filter
+neutrino_selection_filter_slim.AnalysisTools.weight: @local::event_weight_analysis_slim
+neutrino_selection_filter_slim.AnalysisTools.image: @local::image_analysis_slim
+
+neutrino_selection_filter_slim_oldflux_rw: @local::neutrino_selection_filter_slim
+neutrino_selection_filter_slim_oldflux_rw.AnalysisTools.weight: @local::event_weight_analysis_slim_oldflux_rw

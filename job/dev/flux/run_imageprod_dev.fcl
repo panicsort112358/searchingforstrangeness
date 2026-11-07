@@ -1,0 +1,30 @@
+#include "microboone_eventweight_service.fcl"
+#include "redk2nu.fcl"
+#include "eventweight_microboone_sept24_numi_fhc.fcl"
+#include "run_nuselection.fcl"
+
+process_name: ImageProdDev
+
+services.TFileService.fileName: "imaging_dev.root"
+services.UBEventWeight: @local::microboone_eventweight_service
+services.NuRandomService: @local::microboone_seedservice
+
+physics.producers.generator: @local::microboone_redk2nu_fhc
+physics.producers.eventweightSep24: @local::microboone_eventweight_sept24
+physics.producers.imageprod: @local::standard_image_producer
+physics.producers.inferenceprod: @local::standard_inference_producer
+
+physics.path1: [ generator, eventweightSep24, imageprod, inferenceprod, nuselection ]
+physics.trigger_paths: [ path1 ]
+
+event_weight_analysis_dev: {
+  @table::event_weight_analysis
+  genieAllUniverses: 100
+  ppfxAllUniverses: 100
+  useReweightedFlux: false
+  eventWeightProcessName00: "ImageProdDev"
+}
+
+physics.filters.nuselection.AnalysisTools.weight: @local::event_weight_analysis_dev
+physics.filters.nuselection.CountWithOpFilter: false
+physics.filters.nuselection.OpFilterProcName: ""

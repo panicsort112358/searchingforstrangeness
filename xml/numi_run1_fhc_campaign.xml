@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+
+<!DOCTYPE project [
+    <!ENTITY release "v08_00_00_92">
+    <!ENTITY user "nlane">
+    <!ENTITY name "numi_run1_fhc_campaign">
+    <!ENTITY initsrc "runtime/scripts/initsrc.sh">
+
+    <!ENTITY tar_dir "/pnfs/uboone/scratch/users/nlane/tarballs">
+    <!ENTITY larsoft_tar "&tar_dir;/strangeness.tar">
+
+    <!ENTITY input_beam "New_NuMI_Flux_Run_1_FHC_Pandora_Reco2_reco2_reco2">
+    <!ENTITY input_dirt "prodgenie_numi_uboone_overlay_dirt_fhc_mcc9_run1_v28_all_snapshot">
+    <!ENTITY input_strangeness "prod_strange_resample_fhc_run1_fhc_reco2_reco2">
+    <!ENTITY input_ext "prod_mcc9_v08_00_00_45_extnumi_reco2_run1_all_reco2">
+
+    <!ENTITY fcl_redk2nu_old "run_redk2nu_v4_9_2_fhc.fcl">
+    <!ENTITY fcl_evtw_old_00 "run_eventweight_microboone_sept24_numi_fhc_oldflux_rw.fcl">
+    <!ENTITY fcl_evtw_reint "run_eventweight_microboone_g4rwt_reint.fcl">
+    <!ENTITY fcl_redk2nu "run_redk2nu_fhc.fcl">
+    <!ENTITY fcl_evtw_00 "run_eventweight_microboone_sept24_numi_fhc.fcl">
+    <!ENTITY fcl_imageprod "run_imageprod.fcl">
+    <!ENTITY fcl_nuselection "run_nuselection_slim.fcl">
+    <!ENTITY fcl_nuselection_old "run_nuselection_slim_oldflux_rw.fcl">
+    <!ENTITY fcl_nuselection_data "run_nuselection_data_slim.fcl">
+]>
+
+<job>
+<project name="&name;">
+
+    <numevents>-1</numevents>
+    <os>SL7</os>
+    <resource>DEDICATED,OPPORTUNISTIC,OFFSITE</resource>
+    <larsoft>
+        <tag>&release;</tag>
+        <qual>e17:prof</qual>
+        <local>&larsoft_tar;</local>
+    </larsoft>
+    <check>1</check>
+    <copy>0</copy>
+    <version>prod_&release;</version>
+    <memory>4000</memory>
+    <disk>20GB</disk>
+    <schema>https</schema>
+    <maxfilesperjob>1</maxfilesperjob>
+
+    <stage name="beam">
+        <inputdef>&input_beam;</inputdef>
+        <fcl>&fcl_redk2nu;</fcl>
+        <fcl>&fcl_evtw_00;</fcl>
+        <fcl>&fcl_imageprod;</fcl>
+        <fcl>&fcl_nuselection;</fcl>
+        <initsource>&initsrc;</initsource>
+        <outdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/beam/run1_fhc/out</outdir>
+        <logdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/beam/run1_fhc/log</logdir>
+        <workdir>/pnfs/uboone/scratch/users/&user;/staging/ntuples/&release;/&name;/beam/run1_fhc</workdir>
+        <datatier>selected</datatier>
+        <numjobs>25</numjobs>
+    </stage>
+
+    <stage name="dirt">
+        <inputdef>&input_dirt;</inputdef>
+        <fcl>&fcl_redk2nu_old;</fcl>
+        <fcl>&fcl_evtw_old_00;</fcl>
+        <fcl>&fcl_evtw_reint;</fcl>
+        <fcl>&fcl_imageprod;</fcl>
+        <fcl>&fcl_nuselection_old;</fcl>
+        <initsource>&initsrc;</initsource>
+        <outdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/dirt/run1_fhc/out</outdir>
+        <logdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/dirt/run1_fhc/log</logdir>
+        <workdir>/pnfs/uboone/scratch/users/&user;/staging/ntuples/&release;/&name;/dirt/run1_fhc</workdir>
+        <datatier>selected</datatier>
+        <numjobs>25</numjobs>
+    </stage>
+
+    <stage name="strangeness">
+        <inputdef>&input_strangeness;</inputdef>
+        <fcl>&fcl_redk2nu;</fcl>
+        <fcl>&fcl_evtw_00;</fcl>
+        <fcl>&fcl_imageprod;</fcl>
+        <fcl>&fcl_nuselection;</fcl>
+        <initsource>&initsrc;</initsource>
+        <outdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/strangeness/run1_fhc/out</outdir>
+        <logdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/strangeness/run1_fhc/log</logdir>
+        <workdir>/pnfs/uboone/scratch/users/&user;/staging/ntuples/&release;/&name;/strangeness/run1_fhc</workdir>
+        <datatier>selected</datatier>
+        <numjobs>25</numjobs>
+    </stage>
+
+    <stage name="ext">
+        <inputdef>&input_ext;</inputdef>
+        <fcl>&fcl_imageprod;</fcl>
+        <fcl>&fcl_nuselection_data;</fcl>
+        <initsource>&initsrc;</initsource>
+        <outdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/ext/run1_fhc/out</outdir>
+        <logdir>/pnfs/uboone/scratch/users/&user;/ntuples/&release;/&name;/ext/run1_fhc/log</logdir>
+        <workdir>/pnfs/uboone/scratch/users/&user;/staging/ntuples/&release;/&name;/ext/run1_fhc</workdir>
+        <datatier>selected</datatier>
+        <numjobs>25</numjobs>
+    </stage>
+
+</project>
+</job>

@@ -1,0 +1,373 @@
+#ifndef ANALYSIS_IMAGE_CXX
+#define ANALYSIS_IMAGE_CXX
+
+#include "art/Framework/Principal/Event.h"
+#include "art/Framework/Services/Optional/TFileService.h"
+#include "art/Framework/Services/Registry/ServiceHandle.h"
+#include "canvas/Persistency/Common/Ptr.h"
+#include "canvas/Utilities/InputTag.h"
+#include "cetlib_except/exception.h"
+#include "fhiclcpp/ParameterSet.h"
+#include "larcore/Geometry/Geometry.h"
+#include "larcorealg/Geometry/GeometryCore.h"
+#include "larcoreobj/SimpleTypesAndConstants/RawTypes.h"
+#include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
+#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
+#include "lardata/RecoBaseProxy/ProxyBase.h"
+#include "lardata/Utilities/GeometryUtilities.h"
+#include "lardataobj/AnalysisBase/BackTrackerMatchingData.h"
+#include "lardataobj/AnalysisBase/MVAOutput.h"
+#include "lardataobj/RecoBase/Cluster.h"
+#include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/PFParticle.h"
+#include "lardataobj/RecoBase/Slice.h"
+#include "lardataobj/RecoBase/Vertex.h"
+#include "lardataobj/RecoBase/Wire.h"
+#include "messagefacility/MessageLogger/MessageLogger.h"
+#include "nusimdata/SimulationBase/MCParticle.h"
+#include "nusimdata/SimulationBase/MCTruth.h"
+
+#include "AnalysisToolBase.h"
+#include "Products/InferenceMetrics.h"
+#include "Products/InferencePredictions.h"
+#include "Products/ImageFeatures.h"
+#include "Helpers/PandoraUtilities.h"
+#include "Helpers/ProxyTypes.h"
+#include "ImagePipeline/SemanticClassifier.h"
+
+#include <TDirectoryFile.h>
+#include <TFile.h>
+#include <TTree.h>
+#include <TVector3.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <cmath>
+#include <limits>
+#include <numeric>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace analysis {
+
+class ImageAnalysis : public AnalysisToolBase {
+public:
+    explicit ImageAnalysis(fhicl::ParameterSet const &p);
+    ~ImageAnalysis() override = default;
+
+    void configure(const fhicl::ParameterSet &p) override;
+    void analyseEvent(const art::Event &event, bool is_data) override {}
+    void analyseSlice(const art::Event &event,
+                                        std::vector<common::ProxyPfpElem_t> &pfp_pxy_vec,
+                                        bool is_data, bool is_selected) override;
+    void setBranches(TTree *_tree) override;
+    void resetTTree(TTree *_tree) override;
+
+private:
+    art::InputTag fPFPproducer;
+    art::InputTag fCLSproducer;
+    art::InputTag fSLCproducer;
+    art::InputTag fHITproducer;
+    art::InputTag fWIREproducer;
+    art::InputTag fMCPproducer;
+    art::InputTag fImagesCroppedTag;
+    art::InputTag fImagesFullTag;
+    art::InputTag fInferencePredTag;
+    art::InputTag fInferencePerfTag;
+
+    float _reco_neutrino_vertex_x{
+        std::numeric_limits<float>::quiet_NaN()};
+    float _reco_neutrino_vertex_y{
+        std::numeric_limits<float>::quiet_NaN()};
+    float _reco_neutrino_vertex_z{
+        std::numeric_limits<float>::quiet_NaN()};
+
+    std::vector<int> _slice_semantic_active_pixels_u;
+    std::vector<int> _slice_semantic_active_pixels_v;
+    std::vector<int> _slice_semantic_active_pixels_w;
+    std::vector<int> _full_semantic_active_pixels_u;
+    std::vector<int> _full_semantic_active_pixels_v;
+    std::vector<int> _full_semantic_active_pixels_w;
+
+    std::vector<std::string> _semantic_label_names;
+
+    int _active_pixels_u{0};
+    int _active_pixels_v{0};
+    int _active_pixels_w{0};
+    int _full_active_pixels_u{0};
+    int _full_active_pixels_v{0};
+    int _full_active_pixels_w{0};
+
+    bool _is_vtx_in_image_u{false};
+    bool _is_vtx_in_image_v{false};
+    bool _is_vtx_in_image_w{false};
+    bool _is_vtx_in_full_image_u{false};
+    bool _is_vtx_in_full_image_v{false};
+    bool _is_vtx_in_full_image_w{false};
+
+    std::vector<std::string> _inf_model;
+    std::vector<int> _inf_score_begin;
+    std::vector<int> _inf_n_scores;
+    std::vector<float> _inf_scores;
+
+    std::vector<float> _inf_t_exec_total_ms;
+    std::vector<float> _inf_t_child_infer_ms;
+    std::vector<float> _inf_child_max_rss_mb;
+
+    static std::vector<int> countActiveSemanticLabels(
+            const std::vector<uint8_t> &labels, size_t nlabels);
+    static int countActivePixels(const std::vector<int32_t> &coords);
+};
+
+ImageAnalysis::ImageAnalysis(const fhicl::ParameterSet &pset) {
+    this->configure(pset);
+}
+
+void ImageAnalysis::configure(const fhicl::ParameterSet &p) {
+    fPFPproducer = p.get<art::InputTag>("PFPproducer");
+    fCLSproducer = p.get<art::InputTag>("CLSproducer");
+    fSLCproducer = p.get<art::InputTag>("SLCproducer");
+    fHITproducer = p.get<art::InputTag>("HITproducer");
+    fWIREproducer = p.get<art::InputTag>("WIREproducer");
+    fMCPproducer = p.get<art::InputTag>("MCPproducer");
+    fImagesCroppedTag =
+        p.get<art::InputTag>("ImagesCroppedTag",
+                             p.get<art::InputTag>("ImagesSliceTag", art::InputTag{"imageprod", "CroppedWindow"}));
+    fImagesFullTag =
+        p.get<art::InputTag>("ImagesFullTag", art::InputTag{"imageprod", "FullWindow"});
+    fInferencePredTag =
+        p.get<art::InputTag>("InferencePredTag", art::InputTag{});
+    fInferencePerfTag =
+        p.get<art::InputTag>("InferencePerfTag", art::InputTag{});
+}
+
+void ImageAnalysis::setBranches(TTree *_tree) {
+    _tree->Branch("slice_semantic_active_pixels_u", &_slice_semantic_active_pixels_u);
+    _tree->Branch("slice_semantic_active_pixels_v", &_slice_semantic_active_pixels_v);
+    _tree->Branch("slice_semantic_active_pixels_w", &_slice_semantic_active_pixels_w);
+    _tree->Branch("full_semantic_active_pixels_u", &_full_semantic_active_pixels_u);
+    _tree->Branch("full_semantic_active_pixels_v", &_full_semantic_active_pixels_v);
+    _tree->Branch("full_semantic_active_pixels_w", &_full_semantic_active_pixels_w);
+    _tree->Branch("semantic_label_names", &_semantic_label_names);
+    _tree->Branch("active_pixels_u", &_active_pixels_u, "active_pixels_u/I");
+    _tree->Branch("active_pixels_v", &_active_pixels_v, "active_pixels_v/I");
+    _tree->Branch("active_pixels_w", &_active_pixels_w, "active_pixels_w/I");
+    _tree->Branch("full_active_pixels_u", &_full_active_pixels_u, "full_active_pixels_u/I");
+    _tree->Branch("full_active_pixels_v", &_full_active_pixels_v, "full_active_pixels_v/I");
+    _tree->Branch("full_active_pixels_w", &_full_active_pixels_w, "full_active_pixels_w/I");
+    _tree->Branch("is_vtx_in_image_u", &_is_vtx_in_image_u, "is_vtx_in_image_u/O");
+    _tree->Branch("is_vtx_in_image_v", &_is_vtx_in_image_v, "is_vtx_in_image_v/O");
+    _tree->Branch("is_vtx_in_image_w", &_is_vtx_in_image_w, "is_vtx_in_image_w/O");
+    _tree->Branch("is_vtx_in_full_image_u", &_is_vtx_in_full_image_u, "is_vtx_in_full_image_u/O");
+    _tree->Branch("is_vtx_in_full_image_v", &_is_vtx_in_full_image_v, "is_vtx_in_full_image_v/O");
+    _tree->Branch("is_vtx_in_full_image_w", &_is_vtx_in_full_image_w, "is_vtx_in_full_image_w/O");
+
+    _tree->Branch("inf_model", &_inf_model);
+    _tree->Branch("inf_score_begin", &_inf_score_begin);
+    _tree->Branch("inf_n_scores", &_inf_n_scores);
+    _tree->Branch("inf_scores", &_inf_scores);
+
+    _tree->Branch("inf_t_exec_total_ms", &_inf_t_exec_total_ms);
+    _tree->Branch("inf_t_child_infer_ms", &_inf_t_child_infer_ms);
+    _tree->Branch("inf_child_max_rss_mb", &_inf_child_max_rss_mb);
+}
+
+void ImageAnalysis::resetTTree(TTree *_tree) {
+    _reco_neutrino_vertex_x = std::numeric_limits<float>::quiet_NaN();
+    _reco_neutrino_vertex_y = std::numeric_limits<float>::quiet_NaN();
+    _reco_neutrino_vertex_z = std::numeric_limits<float>::quiet_NaN();
+
+    _slice_semantic_active_pixels_u.clear();
+    _slice_semantic_active_pixels_v.clear();
+    _slice_semantic_active_pixels_w.clear();
+    _full_semantic_active_pixels_u.clear();
+    _full_semantic_active_pixels_v.clear();
+    _full_semantic_active_pixels_w.clear();
+    
+    if (_semantic_label_names.empty()) {
+        _semantic_label_names.assign(
+                image::SemanticClassifier::semantic_label_names.begin(),
+                image::SemanticClassifier::semantic_label_names.end());
+    }
+    
+    _active_pixels_u = 0;
+    _active_pixels_v = 0;
+    _active_pixels_w = 0;
+    _full_active_pixels_u = 0;
+    _full_active_pixels_v = 0;
+    _full_active_pixels_w = 0;
+    
+    _is_vtx_in_image_u = false;
+    _is_vtx_in_image_v = false;
+    _is_vtx_in_image_w = false;
+    _is_vtx_in_full_image_u = false;
+    _is_vtx_in_full_image_v = false;
+    _is_vtx_in_full_image_w = false;
+
+    _inf_model.clear();
+    _inf_score_begin.clear();
+    _inf_n_scores.clear();
+    _inf_scores.clear();
+
+    _inf_t_exec_total_ms.clear();
+    _inf_t_child_infer_ms.clear();
+    _inf_child_max_rss_mb.clear();
+}
+
+std::vector<int> ImageAnalysis::countActiveSemanticLabels(
+        const std::vector<uint8_t> &labels, size_t nlabels) {
+    std::vector<int> counts(nlabels, 0);
+    for (uint8_t label : labels) {
+        auto const idx = static_cast<std::size_t>(label);
+        if (idx < nlabels) {
+            ++counts[idx];
+        }
+    }
+    return counts;
+}
+
+int ImageAnalysis::countActivePixels(const std::vector<int32_t> &coords) {
+    return static_cast<int>(coords.size() / 2);
+}
+
+void ImageAnalysis::analyseSlice(
+        const art::Event &event, std::vector<common::ProxyPfpElem_t> &pfp_pxy_vec,
+        bool is_data, bool is_selected) {
+    for (const auto &pfp : pfp_pxy_vec) {
+        if (pfp->IsPrimary()) {
+            auto vtx = pfp.get<recob::Vertex>();
+            if (vtx.size() > 0) {
+                const auto &pos = vtx.at(0)->position();
+                _reco_neutrino_vertex_x = pos.X();
+                _reco_neutrino_vertex_y = pos.Y();
+                _reco_neutrino_vertex_z = pos.Z();
+            }
+            break;
+        }
+    }
+
+    auto in_img = [](const image::ImageFeatures &im, double drift, double wire) {
+        bool in_row = (drift >= im.origin_y) &&
+                                    (drift < im.origin_y + im.pixel_h * static_cast<double>(im.height));
+        bool in_col = (wire >= im.origin_x) &&
+                                    (wire < im.origin_x + im.pixel_w * static_cast<double>(im.width));
+        return in_row && in_col;
+    };
+
+    std::optional<TVector3> vtx_proj_u;
+    std::optional<TVector3> vtx_proj_v;
+    std::optional<TVector3> vtx_proj_w;
+    if (!std::isnan(_reco_neutrino_vertex_x)) {
+        TVector3 vtx_pos_3d(_reco_neutrino_vertex_x, _reco_neutrino_vertex_y,
+                            _reco_neutrino_vertex_z);
+        vtx_proj_u = common::ProjectToWireView(
+            vtx_pos_3d.X(), vtx_pos_3d.Y(), vtx_pos_3d.Z(), common::TPC_VIEW_U);
+        vtx_proj_v = common::ProjectToWireView(
+            vtx_pos_3d.X(), vtx_pos_3d.Y(), vtx_pos_3d.Z(), common::TPC_VIEW_V);
+        vtx_proj_w = common::ProjectToWireView(
+            vtx_pos_3d.X(), vtx_pos_3d.Y(), vtx_pos_3d.Z(), common::TPC_VIEW_W);
+    }
+
+    auto fill_window_metrics = [&](art::InputTag const &tag,
+                                   int &active_u, int &active_v, int &active_w,
+                                   std::vector<int> &sem_u, std::vector<int> &sem_v, std::vector<int> &sem_w,
+                                   bool &vtx_u, bool &vtx_v, bool &vtx_w) {
+        art::Handle<std::vector<image::ImageFeatures>> imageH;
+        event.getByLabel(tag, imageH);
+        if (!imageH.isValid()) {
+            throw cet::exception("ImageAnalysis")
+                << "Required ImageFeatures collection with tag \"" << tag.encode()
+                << "\" is missing for event " << event.id()
+                << ". Check the image production stage and InputTag wiring.";
+        }
+
+        auto const validated =
+            image::validateImagePlaneTriplet(*imageH);
+        if (!validated) {
+            throw cet::exception("ImageAnalysis")
+                << "ImageFeatures collection with tag \"" << tag.encode()
+                << "\" violates the sparse U/V/W contract for event "
+                << event.id() << ": " << validated.error;
+        }
+        auto const *plane_u = validated.planes[0];
+        auto const *plane_v = validated.planes[1];
+        auto const *plane_w = validated.planes[2];
+
+        active_u = countActivePixels(plane_u->coords);
+        active_v = countActivePixels(plane_v->coords);
+        active_w = countActivePixels(plane_w->coords);
+
+        if (!is_data) {
+            size_t const nlabels = image::SemanticClassifier::semantic_label_names.size();
+            sem_u = countActiveSemanticLabels(plane_u->semantic, nlabels);
+            sem_v = countActiveSemanticLabels(plane_v->semantic, nlabels);
+            sem_w = countActiveSemanticLabels(plane_w->semantic, nlabels);
+        }
+
+        if (vtx_proj_u && vtx_proj_v && vtx_proj_w) {
+            vtx_u = in_img(*plane_u, vtx_proj_u->X(), vtx_proj_u->Z());
+            vtx_v = in_img(*plane_v, vtx_proj_v->X(), vtx_proj_v->Z());
+            vtx_w = in_img(*plane_w, vtx_proj_w->X(), vtx_proj_w->Z());
+        }
+
+        if (active_u == 0 && active_v == 0 && active_w == 0) {
+            mf::LogWarning("ImageAnalysis")
+                << "ImageFeatures collection with tag \"" << tag.encode()
+                << "\" is present for event " << event.id()
+                << " but all u/v/w planes are empty."
+                << " The valid metadata-bearing U/V/W planes are recorded "
+                   "with zero active pixels.";
+        }
+    };
+
+    fill_window_metrics(fImagesCroppedTag,
+                        _active_pixels_u, _active_pixels_v, _active_pixels_w,
+                        _slice_semantic_active_pixels_u, _slice_semantic_active_pixels_v, _slice_semantic_active_pixels_w,
+                        _is_vtx_in_image_u, _is_vtx_in_image_v, _is_vtx_in_image_w);
+
+    fill_window_metrics(fImagesFullTag,
+                        _full_active_pixels_u, _full_active_pixels_v, _full_active_pixels_w,
+                        _full_semantic_active_pixels_u, _full_semantic_active_pixels_v, _full_semantic_active_pixels_w,
+                        _is_vtx_in_full_image_u, _is_vtx_in_full_image_v, _is_vtx_in_full_image_w);
+
+    if (!fInferencePredTag.label().empty()) {
+        art::Handle<image::InferencePredictions> predH;
+        event.getByLabel(fInferencePredTag, predH);
+        if (predH.isValid()) {
+            for (auto const &mp : predH->per_model) {
+                _inf_model.push_back(mp.model);
+                _inf_score_begin.push_back(static_cast<int>(_inf_scores.size()));
+                _inf_n_scores.push_back(static_cast<int>(mp.scores.size()));
+                _inf_scores.insert(_inf_scores.end(), mp.scores.begin(), mp.scores.end());
+            }
+        } else {
+            mf::LogWarning("ImageAnalysis")
+                    << "InferencePredictions with tag \"" << fInferencePredTag.encode()
+                    << "\" not found or invalid.";
+        }
+    }
+
+    if (!fInferencePerfTag.label().empty()) {
+        art::Handle<image::InferenceMetrics> perfH;
+        event.getByLabel(fInferencePerfTag, perfH);
+        if (perfH.isValid()) {
+            for (auto const &mp : perfH->per_model) {
+                _inf_t_exec_total_ms.push_back(mp.t_exec_total_ms);
+                _inf_t_child_infer_ms.push_back(mp.t_child_infer_ms);
+                _inf_child_max_rss_mb.push_back(mp.child_max_rss_mb);
+            }
+        } else {
+            mf::LogWarning("ImageAnalysis")
+                    << "InferenceMetrics with tag \"" << fInferencePerfTag.encode()
+                    << "\" not found or invalid.";
+        }
+    }
+
+}
+
+DEFINE_ART_CLASS_TOOL(ImageAnalysis)
+}
+
+#endif

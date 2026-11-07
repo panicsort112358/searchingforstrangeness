@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+from typing import Dict, Tuple
+
+import torch
+import torch.nn as nn
+
+import MinkowskiEngine as ME
+
+from me_compat import replace_feature, submanifold_convolution
+
+
+class SparseLayerNorm(nn.Module):
+    """
+    Batch-size/occupancy agnostic normalisation:
+    LayerNorm over channels per sparse site (point).
+    """
+
+    def __init__(self, c: int, eps: float = 1e-6):
+        super().__init__()
+        self.ln = nn.LayerNorm(int(c), eps=eps)
+
+    def forward(self, x: ME.SparseTensor) -> ME.SparseTensor:
+        return replace_feature(x, self.ln(x.F))
+
+
+class ResBlock(nn.Module):
+    def __init__(self, cin: int, cout: int):
+        super().__init__()
+        self.conv1 = submanifold_convolution(
+            cin, cout, kernel_size=3, dimension=2, bias=False
+        )
+        self.n1 = SparseLayerNorm(cout)
+        self.conv2 = submanifold_convolution(
+            cout, cout, kernel_size=3, dimension=2, bias=False
+        )
+        self.n2 = SparseLayerNorm(cout)
+        # NOTE:
+        # In-place activations are a common source of surprises for gradient-based
+        # attribution methods (multiple backward passes / hooks / captum-style tools).
+        # Keeping this non-inplace makes attribution maps stable.
+        self.act = ME.MinkowskiReLU(inplace=False)
+        self.proj = None
+        if cin != cout:
+            self.proj = nn.Sequential(
+                ME.MinkowskiLinear(cin, cout, bias=False),
+                SparseLayerNorm(cout),
+            )
+
+    def forward(self, x: ME.SparseTensor) -> ME.SparseTensor:
+        identity = x if self.proj is None else self.proj(x)
+        out = self.act(self.n1(self.conv1(x)))
+        out = self.n2(self.conv2(out))
+        return self.act(out + identity)
+
+
+class Down(nn.Sequential):
+    def __init__(self, cin: int, cout: int):
+        super().__init__(
+            ME.MinkowskiConvolution(cin, cout, kernel_size=2, stride=2, dimension=2, bias=False),
+            SparseLayerNorm(cout),
+            ME.MinkowskiReLU(inplace=False),
+        )
+
+
+class SparseResNet2D(nn.Module):
+    """
+    Minimal 2D sparse residual encoder -> global pooled embedding.
+    backbone(x) returns [B, D] (not logits), for late/set fusion.
+    """
+
+    def __init__(self, in_ch: int, base: int, blocks: Tuple[int, ...], embed_dim: int):
+        super().__init__()
+        self.stem = nn.Sequential(
+            submanifold_convolution(
+                in_ch, base, kernel_size=3, dimension=2, bias=False
+            ),
+            SparseLayerNorm(base),
+            ME.MinkowskiReLU(inplace=False),
+        )
+        self.blocks = nn.ModuleList()
+        self.downs = nn.ModuleList()
+        ch = int(base)
+        for li, nb in enumerate(blocks):
+            self.blocks.append(nn.Sequential(*[ResBlock(ch, ch) for _ in range(int(nb))]))
+            if li < len(blocks) - 1:
+                self.downs.append(Down(ch, ch * 2))
+                ch *= 2
+        self.pool = ME.MinkowskiGlobalMaxPooling()
+        self.proj = nn.Linear(ch, int(embed_dim))
+
+    def forward(self, x: ME.SparseTensor) -> torch.Tensor:
+        x = self.stem(x)
+        for li, blk in enumerate(self.blocks):
+            x = blk(x)
+            if li < len(self.downs):
+                x = self.downs[li](x)
+        x = self.pool(x)
+        return self.proj(x.F)  # [B,D]
+
+
+_PRESETS: Dict[str, Dict] = {
+    # (base channels, blocks per level); 512x512 -> 3 or 4 downs is typical
+    "tiny": {"base": 16, "blocks": (1, 1, 1)},
+    "small": {"base": 32, "blocks": (1, 1, 1, 1)},
+    "base": {"base": 32, "blocks": (2, 2, 2, 2)},
+    "wide": {"base": 48, "blocks": (2, 2, 2, 2)},
+}
+
+
+def make_backbone(name: str, in_ch: int, embed_dim: int) -> nn.Module:
+    """
+    Factory for quick backbone sweeps:
+      BACKBONE={tiny,small,base,wide}
+    """
+    if name not in _PRESETS:
+        raise ValueError(f"unknown BACKBONE={name!r}; choose from {sorted(_PRESETS)}")
+    p = _PRESETS[name]
+    return SparseResNet2D(in_ch=int(in_ch), base=int(p["base"]), blocks=tuple(p["blocks"]), embed_dim=int(embed_dim))

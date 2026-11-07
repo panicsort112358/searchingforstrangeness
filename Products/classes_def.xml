@@ -1,0 +1,19 @@
+<lcgdict>
+  <class name="image::ImageFeatures"/>
+  <class name="art::Wrapper<image::ImageFeatures>"/>
+  <class name="std::vector<image::ImageFeatures>"/>
+  <class name="art::Wrapper<std::vector<image::ImageFeatures>>"/>
+
+  <class name="image::ModelMetrics"/>
+  <class name="std::vector<image::ModelMetrics>"/>
+  <class name="art::Wrapper<std::vector<image::ModelMetrics>>"/>
+  <class name="image::InferenceMetrics"/>
+  <class name="art::Wrapper<image::InferenceMetrics>"/>
+
+  <class name="image::ModelPrediction"/>
+  <class name="std::vector<image::ModelPrediction>"/>
+  <class name="art::Wrapper<std::vector<image::ModelPrediction>>"/>
+  <class name="image::InferencePredictions"/>
+  <class name="art::Wrapper<image::InferencePredictions>"/>
+
+</lcgdict>

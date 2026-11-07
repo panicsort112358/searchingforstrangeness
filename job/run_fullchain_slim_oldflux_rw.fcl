@@ -1,0 +1,75 @@
+#include "seedservice_microboone.fcl"
+#include "services_microboone.fcl"
+#include "microboone_eventweight_service.fcl"
+#include "redk2nu_g4_9_2.fcl"
+#include "eventweight_microboone_sept24_numi_fhc_oldflux_rw.fcl"
+#include "selectionconfig.fcl"
+
+process_name: FullChainNuSelectionSlimOldFluxRW
+
+services: {
+  TFileService: { fileName: "fullchain_nuselection_slim_oldflux_rw_hist.root" }
+  TimeTracker: {}
+  MemoryTracker: {}
+  RandomNumberGenerator: {}
+
+  Geometry: @local::microboone_geo
+  DetectorPropertiesService: @local::microboone_detproperties
+  ParticleInventoryService: @local::standard_particleinventoryservice
+  LArProperties: @local::microboone_properties
+  DetectorClocksService: @local::microboone_detectorclocks
+
+  @table::microboone_services_reco
+  message: @local::standard_info
+
+  NuRandomService: @local::microboone_seedservice
+  UBEventWeight: @local::microboone_eventweight_service
+}
+
+services.DetectorClocksService.InheritClockConfig: false
+services.DetectorClocksService.TriggerOffsetTPC: -0.400e3
+
+services.SpaceCharge.EnableCorrSCE: true
+services.SpaceCharge.EnableSimEfieldSCE: true
+services.SpaceCharge.EnableSimSpatialSCE: true
+
+source: {
+  module_type: RootInput
+  maxEvents: -1
+}
+
+physics: {
+  producers: {
+    generator: @local::microboone_redk2nu_fhc
+    eventweightSep24: @local::microboone_eventweight_sept24_oldflux
+    rns: {
+      module_type: "RandomNumberSaver"
+    }
+    imageprod: @local::standard_image_producer
+  }
+
+  filters: {
+    nuselection: @local::neutrino_selection_filter_slim_oldflux_rw
+  }
+
+  path1: [ generator, rns, eventweightSep24, imageprod, nuselection ]
+  trigger_paths: [ path1 ]
+
+  stream1: [ out1 ]
+  end_paths: [ stream1 ]
+}
+
+physics.filters.nuselection.IsNuMI: true
+physics.filters.nuselection.AnalysisTools.default.makeNuMINtuple: true
+
+physics.filters.nuselection.CountWithOpFilter: false
+physics.filters.nuselection.OpFilterProcName: ""
+
+outputs: {
+  out1: {
+    module_type: RootOutput
+    fileName: "%ifb_%tc_fullchain_nuselection_slim_oldflux_rw.root"
+    dataTier: "selected"
+    compressionLevel: 1
+  }
+}
